@@ -474,24 +474,32 @@
     }
 
     function importData(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const parsed = JSON.parse(event.target.result);
-          if (Array.isArray(parsed)) {
-            records = parsed;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-            init();
-            alert('Data successfully imported!');
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const incoming = JSON.parse(event.target.result);
+      if (Array.isArray(incoming)) {
+        // Merge without losing existing records
+        incoming.forEach(newItem => {
+          const index = records.findIndex(r => r.id === newItem.id);
+          if (index > -1) {
+            records[index] = newItem; // Update existing record if ID matches
+          } else {
+            records.push(newItem);    // Append new record
           }
-        } catch (err) {
-          alert('Invalid JSON file format');
-        }
-      };
-      reader.readAsText(file);
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        init();
+        alert(`Successfully imported and merged ${incoming.length} records!`);
+      }
+    } catch (err) {
+      alert('Invalid JSON file format.');
     }
+  };
+  reader.readAsText(file);
+}
 
     function init() {
       updateStats();
