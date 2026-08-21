@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blood Test Tracker & Monitor</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-12">
+
+  <!-- Header -->
+  <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <svg class="w-7 h-7 text-rose-300" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path>
+        </svg>
+        <h1 class="text-xl font-bold tracking-tight">HemaTrack</h1>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="exportData()" class="text-xs bg-indigo-700 hover:bg-indigo-800 px-2.5 py-1.5 rounded text-indigo-100 transition">Backup</button>
+        <label class="text-xs bg-indigo-700 hover:bg-indigo-800 px-2.5 py-1.5 rounded text-indigo-100 cursor-pointer transition">
+          Import <input type="file" id="importInput" class="hidden" accept=".json" onchange="importData(event)" />
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 mt-6 space-y-6">
+
+    <!-- Overview Stats Bar -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <span class="text-xs font-semibold text-slate-400 uppercase">Total Tests</span>
+        <div id="statTotal" class="text-2xl font-bold text-slate-800 mt-1">0</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <span class="text-xs font-semibold text-rose-500 uppercase">High / High-Risk</span>
+        <div id="statHigh" class="text-2xl font-bold text-rose-600 mt-1">0</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <span class="text-xs font-semibold text-amber-500 uppercase">Low / Low-Risk</span>
+        <div id="statLow" class="text-2xl font-bold text-amber-600 mt-1">0</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-semibold text-emerald-500 uppercase">Normal</span>
+          <div id="statNormal" class="text-2xl font-bold text-emerald-600 mt-1">0</div>
+        </div>
+        <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm px-3.5 py-2 rounded-lg shadow-sm transition">
+          + Add Test
+        </button>
+      </div>
+    </div>
+
+    <!-- Trend Analytics Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">Historical Trend Monitor</h2>
+          <p class="text-xs text-slate-500">Track changes over time with normal range thresholds</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <label for="trendSelect" class="text-xs text-slate-500">Parameter:</label>
+          <select id="trendSelect" onchange="renderChart()" class="text-sm bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+            <!-- Dynamic Options -->
+          </select>
+        </div>
+      </div>
+      <div class="relative h-64 w-full">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Filters & Table Section -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <!-- Search and Filter Bar -->
+      <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row gap-3">
+        <div class="flex-1 relative">
+          <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Search test name or category..." class="w-full pl-3 pr-4 py-2 bg-white text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <select id="filterCategory" onchange="applyFilters()" class="text-xs sm:text-sm bg-white border border-slate-200 rounded-lg px-2.5 py-2 outline-none">
+            <option value="">All Categories</option>
+            <option value="Haematology">Haematology</option>
+            <option value="Lipid Profile">Lipid Profile</option>
+            <option value="Liver Function">Liver Function</option>
+            <option value="Renal Function">Renal Function</option>
+            <option value="Diabetes Screen">Diabetes Screen</option>
+            <option value="Tumour Markers">Tumour Markers</option>
+            <option value="Other">Other</option>
+          </select>
+
+          <select id="filterStatus" onchange="applyFilters()" class="text-xs sm:text-sm bg-white border border-slate-200 rounded-lg px-2.5 py-2 outline-none">
+            <option value="">All Statuses</option>
+            <option value="ALERT">Alerts Only (High/Low)</option>
+            <option value="NORMAL">Normal Only</option>
+          </select>
+
+          <input type="date" id="filterFromDate" onchange="applyFilters()" title="From Date" class="text-xs sm:text-sm bg-white border border-slate-200 rounded-lg px-2 py-2 outline-none" />
+          <input type="date" id="filterToDate" onchange="applyFilters()" title="To Date" class="text-xs sm:text-sm bg-white border border-slate-200 rounded-lg px-2 py-2 outline-none" />
+        </div>
+      </div>
+
+      <!-- Results Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-600">
+          <thead class="bg-slate-100/70 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-4">Date</th>
+              <th class="py-3 px-4">Category</th>
+              <th class="py-3 px-4">Test Name</th>
+              <th class="py-3 px-4 text-right">Result</th>
+              <th class="py-3 px-4">Ref. Range</th>
+              <th class="py-3 px-4 text-center">Status</th>
+              <th class="py-3 px-4 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="testTableBody" class="divide-y divide-slate-100">
+            <!-- Dynamic Rows -->
+          </tbody>
+        </table>
+      </div>
+      <div id="noResultsMsg" class="p-8 text-center text-slate-400 text-sm hidden">
+        No records match the current filters.
+      </div>
+    </div>
+  </main>
+
+  <!-- Add / Edit Modal -->
+  <div id="recordModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl relative max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h3 id="modalTitle" class="text-lg font-bold text-slate-800">Add Lab Result</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+      </div>
+      <form id="recordForm" onsubmit="saveRecord(event)" class="space-y-3.5">
+        <input type="hidden" id="recordId" />
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Date</label>
+            <input type="date" id="formDate" required class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Category</label>
+            <select id="formCategory" required class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="Haematology">Haematology</option>
+              <option value="Lipid Profile">Lipid Profile</option>
+              <option value="Liver Function">Liver Function</option>
+              <option value="Renal Function">Renal Function</option>
+              <option value="Diabetes Screen">Diabetes Screen</option>
+              <option value="Tumour Markers">Tumour Markers</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Test Name (e.g. Total Cholesterol, HbA1c)</label>
+          <input type="text" id="formTestName" required placeholder="e.g., Fasting Glucose" class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Result Value</label>
+            <input type="number" step="any" id="formValue" required placeholder="e.g. 5.4" class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Unit</label>
+            <input type="text" id="formUnit" placeholder="mmol/L, %, g/L, etc." class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Min Limit (Optional)</label>
+            <input type="number" step="any" id="formMin" placeholder="Leave blank if none" class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Max Limit (Optional)</label>
+            <input type="number" step="any" id="formMax" placeholder="Leave blank if none" class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Notes / Diagnostic Context</label>
+          <input type="text" id="formNotes" placeholder="e.g. Fasting sample, high-risk flag" class="w-full border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="pt-2 flex justify-end space-x-2">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'blood_test_records_data_v1';
+    let records = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let chartInstance = null;
+
+    // Seed realistic default samples if empty
+    if (records.length === 0) {
+      records = [
+        { id: '1', date: '2026-08-16', category: 'Haematology', name: 'ESR', value: 15, unit: 'mm/hr', min: 0, max: 10, notes: 'Above limit' },
+        { id: '2', date: '2026-08-16', category: 'Haematology', name: 'Haemoglobin', value: 14.7, unit: 'g/dL', min: 13.0, max: 17.5, notes: '' },
+        { id: '3', date: '2026-08-16', category: 'Lipid Profile', name: 'Total Cholesterol', value: 6.4, unit: 'mmol/L', min: null, max: 5.2, notes: 'High' },
+        { id: '4', date: '2026-08-16', category: 'Lipid Profile', name: 'LDL Cholesterol', value: 4.9, unit: 'mmol/L', min: null, max: 2.6, notes: 'High' },
+        { id: '5', date: '2026-08-16', category: 'Lipid Profile', name: 'Triglycerides', value: 0.9, unit: 'mmol/L', min: null, max: 1.7, notes: 'Optimal' },
+        { id: '6', date: '2026-08-16', category: 'Liver Function', name: 'GGT', value: 116, unit: 'IU/L', min: null, max: 73, notes: 'High' },
+        { id: '7', date: '2026-08-16', category: 'Diabetes Screen', name: 'HbA1c', value: 5.8, unit: '%', min: null, max: 5.7, notes: 'Prediabetes borderline' },
+        { id: '8', date: '2026-08-16', category: 'Renal Function', name: 'eGFR', value: 102, unit: 'mL/min', min: 90, max: null, notes: 'Normal' }
+      ];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    function evaluateStatus(val, min, max) {
+      if (val === null || val === undefined || isNaN(val)) return { status: 'NORMAL', label: 'Normal', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      if (max !== null && max !== '' && !isNaN(max) && Number(val) > Number(max)) {
+        return { status: 'HIGH', label: 'High', color: 'bg-rose-100 text-rose-700 border-rose-300 font-semibold' };
+      }
+      if (min !== null && min !== '' && !isNaN(min) && Number(val) < Number(min)) {
+        return { status: 'LOW', label: 'Low', color: 'bg-amber-100 text-amber-700 border-amber-300 font-semibold' };
+      }
+      return { status: 'NORMAL', label: 'Normal', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('testTableBody');
+      const emptyMsg = document.getElementById('noResultsMsg');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        emptyMsg.classList.remove('hidden');
+        return;
+      }
+      emptyMsg.classList.add('hidden');
+
+      // Sort newest date first
+      data.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      data.forEach(item => {
+        const { status, label, color } = evaluateStatus(item.value, item.min, item.max);
+        const rangeText = (item.min != null && item.max != null) ? `${item.min} - ${item.max}`
+                        : (item.max != null) ? `< ${item.max}`
+                        : (item.min != null) ? `> ${item.min}` : '-';
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-xs sm:text-sm font-medium text-slate-700 whitespace-nowrap">${item.date}</td>
+          <td class="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">${item.category}</td>
+          <td class="py-3 px-4 font-medium text-slate-800">
+            <div>${item.name}</div>
+            ${item.notes ? `<div class="text-[11px] text-slate-400 font-normal">${item.notes}</div>` : ''}
+          </td>
+          <td class="py-3 px-4 text-right font-bold text-slate-900 whitespace-nowrap">${item.value} <span class="text-xs font-normal text-slate-500">${item.unit || ''}</span></td>
+          <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">${rangeText} ${item.unit || ''}</td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-block text-xs px-2.5 py-0.5 rounded-full border ${color}">${label}</span>
+          </td>
+          <td class="py-3 px-4 text-center whitespace-nowrap space-x-1">
+            <button onclick="editRecord('${item.id}')" class="text-indigo-600 hover:text-indigo-900 p-1 text-xs font-medium">Edit</button>
+            <button onclick="deleteRecord('${item.id}')" class="text-rose-600 hover:text-rose-900 p-1 text-xs font-medium">Del</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateStats() {
+      let high = 0, low = 0, normal = 0;
+      records.forEach(r => {
+        const { status } = evaluateStatus(r.value, r.min, r.max);
+        if (status === 'HIGH') high++;
+        else if (status === 'LOW') low++;
+        else normal++;
+      });
+      document.getElementById('statTotal').innerText = records.length;
+      document.getElementById('statHigh').innerText = high;
+      document.getElementById('statLow').innerText = low;
+      document.getElementById('statNormal').innerText = normal;
+    }
+
+    function updateTrendDropdown() {
+      const select = document.getElementById('trendSelect');
+      const uniqueNames = [...new Set(records.map(r => r.name))].sort();
+      const currentVal = select.value;
+      select.innerHTML = '';
+      uniqueNames.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.innerText = name;
+        select.appendChild(opt);
+      });
+      if (uniqueNames.includes(currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function renderChart() {
+      const selectedName = document.getElementById('trendSelect').value;
+      if (!selectedName) return;
+
+      const filtered = records
+        .filter(r => r.name.toLowerCase() === selectedName.toLowerCase())
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      const labels = filtered.map(r => r.date);
+      const values = filtered.map(r => Number(r.value));
+      const maxLimit = filtered.length > 0 ? filtered[0].max : null;
+      const minLimit = filtered.length > 0 ? filtered[0].min : null;
+
+      const ctx = document.getElementById('trendChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      const datasets = [{
+        label: `${selectedName} (${filtered[0]?.unit || ''})`,
+        data: values,
+        borderColor: '#4f46e5',
+        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.3,
+        pointBackgroundColor: '#4f46e5',
+        pointRadius: 5
+      }];
+
+      if (maxLimit !== null && maxLimit !== undefined && maxLimit !== '') {
+        datasets.push({
+          label: 'Upper Limit',
+          data: Array(labels.length).fill(Number(maxLimit)),
+          borderColor: '#e11d48',
+          borderDash: [5, 5],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false
+        });
+      }
+
+      if (minLimit !== null && minLimit !== undefined && minLimit !== '') {
+        datasets.push({
+          label: 'Lower Limit',
+          data: Array(labels.length).fill(Number(minLimit)),
+          borderColor: '#d97706',
+          borderDash: [5, 5],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false
+        });
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12 } }
+          },
+          scales: {
+            y: { beginAtZero: false, grid: { color: '#f1f5f9' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    function applyFilters() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const cat = document.getElementById('filterCategory').value;
+      const statusFilter = document.getElementById('filterStatus').value;
+      const fromDate = document.getElementById('filterFromDate').value;
+      const toDate = document.getElementById('filterToDate').value;
+
+      const filtered = records.filter(r => {
+        const matchesQuery = r.name.toLowerCase().includes(q) || r.category.toLowerCase().includes(q);
+        const matchesCat = !cat || r.category === cat;
+        const matchesFrom = !fromDate || r.date >= fromDate;
+        const matchesTo = !toDate || r.date <= toDate;
+
+        const { status } = evaluateStatus(r.value, r.min, r.max);
+        let matchesStatus = true;
+        if (statusFilter === 'ALERT') matchesStatus = (status === 'HIGH' || status === 'LOW');
+        if (statusFilter === 'NORMAL') matchesStatus = (status === 'NORMAL');
+
+        return matchesQuery && matchesCat && matchesFrom && matchesTo && matchesStatus;
+      });
+
+      renderTable(filtered);
+    }
+
+    function openModal(isEdit = false) {
+      document.getElementById('recordModal').classList.remove('hidden');
+      if (!isEdit) {
+        document.getElementById('modalTitle').innerText = 'Add Lab Result';
+        document.getElementById('recordForm').reset();
+        document.getElementById('recordId').value = '';
+        document.getElementById('formDate').value = new Date().toISOString().split('T')[0];
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('recordModal').classList.add('hidden');
+    }
+
+    function saveRecord(e) {
+      e.preventDefault();
+      const id = document.getElementById('recordId').value || Date.now().toString();
+      const newRecord = {
+        id,
+        date: document.getElementById('formDate').value,
+        category: document.getElementById('formCategory').value,
+        name: document.getElementById('formTestName').value.trim(),
+        value: parseFloat(document.getElementById('formValue').value),
+        unit: document.getElementById('formUnit').value.trim(),
+        min: document.getElementById('formMin').value ? parseFloat(document.getElementById('formMin').value) : null,
+        max: document.getElementById('formMax').value ? parseFloat(document.getElementById('formMax').value) : null,
+        notes: document.getElementById('formNotes').value.trim()
+      };
+
+      const existingIndex = records.findIndex(r => r.id === id);
+      if (existingIndex > -1) {
+        records[existingIndex] = newRecord;
+      } else {
+        records.push(newRecord);
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      closeModal();
+      init();
+    }
+
+    function editRecord(id) {
+      const r = records.find(item => item.id === id);
+      if (!r) return;
+      document.getElementById('modalTitle').innerText = 'Edit Lab Result';
+      document.getElementById('recordId').value = r.id;
+      document.getElementById('formDate').value = r.date;
+      document.getElementById('formCategory').value = r.category;
+      document.getElementById('formTestName').value = r.name;
+      document.getElementById('formValue').value = r.value;
+      document.getElementById('formUnit').value = r.unit || '';
+      document.getElementById('formMin').value = r.min !== null ? r.min : '';
+      document.getElementById('formMax').value = r.max !== null ? r.max : '';
+      document.getElementById('formNotes').value = r.notes || '';
+      openModal(true);
+    }
+
+    function deleteRecord(id) {
+      if (!confirm('Are you sure you want to delete this result?')) return;
+      records = records.filter(r => r.id !== id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      init();
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `blood_test_data_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+    }
+
+    function importData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (Array.isArray(parsed)) {
+            records = parsed;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+            init();
+            alert('Data successfully imported!');
+          }
+        } catch (err) {
+          alert('Invalid JSON file format');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function init() {
+      updateStats();
+      updateTrendDropdown();
+      renderChart();
+      applyFilters();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
